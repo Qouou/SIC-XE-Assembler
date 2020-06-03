@@ -1,5 +1,4 @@
-# 106213014 
-# 歐芷欣 
+# 讀取 opCode 
 def opTable(mnemonic):
     # 讀入 opCode 檔案
     with open('opCode.txt', 'r') as file :
