@@ -286,7 +286,7 @@ def main():
     global LOCCTR
     global SYMTAB
 
-    f_for_write = open('106213014_middle.txt','w+') # 每次清空再寫入
+    f_for_write = open('middle.txt','w+') # 每次清空再寫入
     with open('(test)SICXE.asm','r') as f:
         lines = f.readlines()
         i = 1 # 計算第幾行
@@ -350,7 +350,7 @@ def main():
         f.close()
     
     objectLine = ''
-    with open('106213014_middle.txt','r') as f_for_write:
+    with open('middle.txt','r') as f_for_write:
         lines = f_for_write.readlines()
         base = lines[-1].strip()
         length = lines[-2].strip()
