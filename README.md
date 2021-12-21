@@ -1,5 +1,7 @@
 # SIC-XE-Assembler
 SIC/XE Assembler in python
+NCNU 1082 系統程式
+
 
 ## Requirement
 - Python 3
