@@ -7,94 +7,8 @@ Mrecord = []
 error = 0
 errorMsg = []
 base = -1
-def opTable():
-    # 讀入 opCode 檔案
-    global OPTAB
-    with open('opCode.txt', 'r') as file :
-    # 一行一行讀入 
-        linesOfData = file.readlines()
-    # data[ <key> ] = <data>
-    # 一個 key 會對應到一個 資料
-    for i in linesOfData :
-        # 用空白切割
-        tmp = i.split()
-        OPTAB[tmp[0]]['format'] = tmp[1]
-        OPTAB[tmp[0]]['opCode'] = tmp[2]
-def token(dataForLine):
-    # 切割好的會有三種格式
-    # TEST LDCH BUFFER, X -> label + mnemonic + operand
-    #      LDA  DATA      -> mnemonic + operand
-    #      RSUB           -> mnemonic
-    label = ''
-    mnemonic = ''
-    operand = ''
-    if len(dataForLine) == 3:
-        label = dataForLine[0]
-        mnemonic = dataForLine[1]
-        operand = dataForLine[2]
-    elif len(dataForLine) == 2:
-        mnemonic = dataForLine[0]
-        operand = dataForLine[1]
-    elif dataForLine[0] == 'RSUB':
-        mnemonic = dataForLine[0]
-    return label, mnemonic, operand
-def checkLines(line):
-    # lines 為 讀入的資料們 (一行為一個單位)
-    # 資料前處理 將資料做切割
-    data = []
-    # 忽略註解
-    # 當有 '.' 出現 代表 '.'之後的內容為註解
-    # 從資料最後項開始刪除 直到把 '.' 不存在為止
-    while '.' in line:
-        line = line[:-1]
-    # 將 \n 從資料列中刪除
-    line = line.strip()
-    # 資料分割方式有 空白 或 TAB (\t)
-    # 當有 TAB 時 
-    if '\t' in line : 
-        # There is a tab in line
-        # 以 TAB 做切割
-        data= line.split('\t')
-    # 若無 TAB 則以空白做切割
-    else:
-        data= line.split(' ')
-        # 如果用空白切割 會造成 ', X' 被切開
-        # 因此要接回去
-        if data[-1] == 'X' and ',' in data[-2]:
-            # 將 最後兩項接起來後 將最後一項刪除
-            data[-2] = data[-2]+' X'
-            data = data[:-1]
-    return data
-def calculateLoc(line,LOCCTR, mnemonic, operand):
-    # extend +4
-    global error
-    try :
-        if '+' in mnemonic:
-            LOCCTR += 4
-        elif mnemonic == 'END': # 避免 PCTR 進入 exception
-            return LOCCTR
-        elif mnemonic == 'RESB':
-            LOCCTR += int(operand)
-        elif mnemonic == 'RESW':
-            LOCCTR += 3 * int(operand)
-        elif mnemonic == 'BASE':
-            return LOCCTR
-        elif mnemonic == 'WORD':
-            LOCCTR += 3
-        elif mnemonic == 'BYTE':
-            if operand.startswith('C'):
-                LOCCTR += len(operand.strip("C'"))
-            elif operand.startswith('X'):
-                # tmp = ''.join([x for x in operand if x.isdigit()])
-                LOCCTR += 1
-        elif '3' in OPTAB[mnemonic]['format']:
-            LOCCTR += 3
-        else:
-            LOCCTR += int(OPTAB[mnemonic]['format'])
-        return LOCCTR
-    except KeyError:
-        error += 1
-        errorMsg.append(line +' ERROR : ' + ' mnemonic error' )
+
+# Each line to calculate
 class Line:
     def __init__(self, line, label, mnemonic, operand,PCTR,LOCCTR):
         self.line = line
@@ -106,22 +20,25 @@ class Line:
         self.forward = False
         self.object_prog = ''
         self.clone = [line,label,mnemonic,operand,PCTR,LOCCTR]
-    def getObj(self):
-        return self.object_prog
+        
     def objectProgram(self):
         self.object_prog = ''
         REGISTERS = {'PC':'8', 'SW':'9', 'A':'0', 'X':'1','L': '2','B':'3', 'S':'4', 'T':'5', 'F':'6'}
         extend = False
+        
         if '+' in self.mnemonic:
             self.mnemonic = self.mnemonic.strip('+ ')
             extend = True 
+            
         if (self.mnemonic in pseudoCode) == False :
             program = int(OPTAB[self.mnemonic]['opCode'],16)
+            
             # Format 1
             if OPTAB[self.mnemonic]['format'] == '1' :
                 # 單純只有 opCode 占 1byte (2位址)
                 self.object_prog = hex(program).upper()[2:].zfill(2)
                 self.forward = False 
+            
             # Format 2 以 OPTAB 中的 formate 得知
             # 占 2 byte
             elif OPTAB[self.mnemonic]['format'] == '2':
@@ -135,6 +52,7 @@ class Line:
                     self.object_prog += REGISTERS[self.operand]
                     self.object_prog += '0'
                 self.forward = False
+            
             # SIC/XE
             # 分成 
             # base relative + 4 / PC relative + 2 / direct + 0 /
@@ -172,11 +90,14 @@ class Line:
                     
                 # indexed Addressing (PC/base)
                 elif ',' in self.operand and 'X' in self.operand:
+                    
                     # 將 , 及 X 刪除 (不論中間有多少空白)
                     while ',' in self.operand:
                         self.operand = self.operand[:-1]
+                    
                     # 當 SYMTAB 存在時 可直接查詢
                     if self.operand in SYMTAB.keys():
+                        
                         # Extend 
                         if extend:
                             self.object_prog += '9' # xbpe = 1001 
@@ -185,6 +106,7 @@ class Line:
                             self.forward = False
                             return self.object_prog
                         tmp = SYMTAB[self.operand] - int(self.PCTR)
+                        
                         # 當計算完在合理範圍 則使用 PC
                         # Indexed Addressing - PC relative
                         if tmp <= 2047 and tmp >= (-2048):
@@ -196,6 +118,7 @@ class Line:
                             else:
                                 self.object_prog += hex(tmp).upper()[2:].zfill(3)
                             self.forward = False
+                        
                         # 範圍超過時 使用 base relative
                         # Indexed Addressing - Base relative
                         else:
@@ -212,6 +135,7 @@ class Line:
                                 # 初始化
                                 self.mnemonic = self.clone[2]
                                 self.operand = self.clone[3]
+                    
                     # Indexed Direct addressing 
                     elif self.operand.isdigit():
                         self.object_prog += '8' # xbpe = 1000
@@ -222,6 +146,7 @@ class Line:
                         # 初始化
                         self.mnemonic = self.clone[2]
                         self.operand = self.clone[3]
+                
                 # 不是 index 單純 base / PC
                 elif self.operand in SYMTAB.keys():
                     # Extend 
@@ -232,6 +157,7 @@ class Line:
                         Mrecord.append(self.LOCCTR+1)
                         return self.object_prog
                     tmp = SYMTAB[self.operand] - self.PCTR
+                    
                     # SIC/XE PC
                     if tmp <= 2047 and tmp >= (-2048):
                         self.object_prog += '2' #0010
@@ -241,6 +167,7 @@ class Line:
                         else:
                             self.object_prog += hex(tmp).upper()[2:].zfill(3)
                         self.forward = False
+                    
                     # SIC/XE base - relative
                     else:
                         # 要確認 base 是否存在
@@ -256,6 +183,7 @@ class Line:
                             # 初始化
                             self.mnemonic = self.clone[2]
                             self.operand = self.clone[3]
+                
                 # operand 不存在
                 # RSUB
                 elif self.mnemonic == 'RSUB':
@@ -271,19 +199,24 @@ class Line:
         elif self.mnemonic == 'BYTE' and self.operand.startswith('X'):
             self.forward = False
             self.object_prog = self.operand.strip("X'")
+        
         elif self.mnemonic == 'BYTE' and self.operand.startswith('C'):
             tmp = self.operand.strip("CX'")
             tmp_for_ord = ''
+            
             # 將後面字串以 ord 找到對應的數字 (10進位)
             # 再轉為 16 進位 並將字串接起來 (要去掉 0x)
             for char in tmp :
                 tmp_for_ord += str(hex(ord(char)).upper()[2:]) 
+            
             self.object_prog = tmp_for_ord
             self.forward = False
+        
         # WORD 
         elif self.mnemonic == 'WORD':
             self.object_prog = hex(int(self.operand)).upper()[2:].zfill(6)
             self.forward = False
+        
         # BASE 跳過
         # RESB, RESW 換行
         else:
@@ -292,6 +225,97 @@ class Line:
 
         
 
+def opTable():
+    # 讀入 opCode 檔案
+    global OPTAB
+    with open('opCode.txt', 'r') as file :
+        # 一行一行讀入 
+        linesOfData = file.readlines()
+    # data[ <key> ] = <data>
+    # 一個 key 會對應到一個 資料
+    for i in linesOfData :
+        # 用空白切割
+        tmp = i.split()
+        OPTAB[tmp[0]]['format'] = tmp[1]
+        OPTAB[tmp[0]]['opCode'] = tmp[2]
+     
+def token(dataForLine):
+    # 切割好的會有三種格式
+    # TEST LDCH BUFFER, X -> label + mnemonic + operand
+    #      LDA  DATA      -> mnemonic + operand
+    #      RSUB           -> mnemonic
+    label = ''
+    mnemonic = ''
+    operand = ''
+    if len(dataForLine) == 3:
+        label = dataForLine[0]
+        mnemonic = dataForLine[1]
+        operand = dataForLine[2]
+    elif len(dataForLine) == 2:
+        mnemonic = dataForLine[0]
+        operand = dataForLine[1]
+    elif dataForLine[0] == 'RSUB':
+        mnemonic = dataForLine[0]
+    return label, mnemonic, operand
+
+def checkLines(line):
+    # lines 為 讀入的資料們 (一行為一個單位)
+    # 資料前處理 將資料做切割
+    data = []
+    # 忽略註解
+    # 當有 '.' 出現 代表 '.'之後的內容為註解
+    # 從資料最後項開始刪除 直到把 '.' 不存在為止
+    while '.' in line:
+        line = line[:-1]
+    # 將 \n 從資料列中刪除
+    line = line.strip()
+    # 資料分割方式有 空白 或 TAB (\t)
+    # 當有 TAB 時 
+    if '\t' in line : 
+        # There is a tab in line
+        # 以 TAB 做切割
+        data= line.split('\t')
+    # 若無 TAB 則以空白做切割
+    else:
+        data= line.split(' ')
+        # 如果用空白切割 會造成 ', X' 被切開
+        # 因此要接回去
+        if data[-1] == 'X' and ',' in data[-2]:
+            # 將 最後兩項接起來後 將最後一項刪除
+            data[-2] = data[-2]+' X'
+            data = data[:-1]
+    return data
+
+def calculateLoc(line,LOCCTR, mnemonic, operand):
+    # extend +4
+    global error
+    try :
+        if '+' in mnemonic:
+            LOCCTR += 4
+        elif mnemonic == 'END': # 避免 PCTR 進入 exception
+            return LOCCTR
+        elif mnemonic == 'RESB':
+            LOCCTR += int(operand)
+        elif mnemonic == 'RESW':
+            LOCCTR += 3 * int(operand)
+        elif mnemonic == 'BASE':
+            return LOCCTR
+        elif mnemonic == 'WORD':
+            LOCCTR += 3
+        elif mnemonic == 'BYTE':
+            if operand.startswith('C'):
+                LOCCTR += len(operand.strip("C'"))
+            elif operand.startswith('X'):
+                # tmp = ''.join([x for x in operand if x.isdigit()])
+                LOCCTR += 1
+        elif '3' in OPTAB[mnemonic]['format']:
+            LOCCTR += 3
+        else:
+            LOCCTR += int(OPTAB[mnemonic]['format'])
+        return LOCCTR
+    except KeyError:
+        error += 1
+        errorMsg.append(line +' ERROR : ' + ' mnemonic error' )
 def main():
     lineInfo = []
     breakNote = -1
@@ -395,8 +419,4 @@ def main():
         # E record
         print('E '+ hex(SYMTAB[lineInfo[-1].operand])[2:].zfill(6))
     
-        # for i in range(len(lineInfo)):
-        #     print(str(lineInfo[i].line) + ' : ' ,end='')
-        #     # print(lineInfo[i].clone)
-        #     print(lineInfo[i].getObj())
 main()
