@@ -1,6 +1,20 @@
-# SIC-XE-Assembler
-SIC/XE Assembler in python
-NCNU 1082 系統程式
+# Implement SIC-XE-Assembler in Python
+
+## About
+Implementation of both one pass and two padd SIC/XE Assembler in python
+
+## Implement
+```shell=
+python SICXE_onepass.py
+```
+```shell=
+python SICXE_twopass.py
+```
+- 接著輸入 input data  
+```shell=
+(test)SICXE.asm
+```
+
 
 
 ## Requirement
